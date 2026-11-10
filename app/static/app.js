@@ -121,12 +121,15 @@ async function readLines(resp, onEvent, signal) {
 }
 
 /* ---------- playground ---------- */
+// Prompts picked because small and large models tend to answer them differently.
 const PRESETS = {
-  "Reasoning": "A farmer has 17 sheep. All but 9 run away. Then he buys twice as many as he has left. How many sheep does he have? Explain briefly.",
-  "Code": "Write a Python function that returns the n-th Fibonacci number in O(log n) time, with a short explanation.",
-  "Summarise": "Summarise in three bullet points why unified memory on Apple Silicon matters for running local LLMs.",
-  "Creative": "Write a four-line poem about a MacBook running out of memory.",
-  "JSON": "Extract the people and cities from this sentence as JSON {\"people\": [], \"cities\": []}: 'Maria flew from Lisbon to Tokyo to meet Kenji and Aiko.'",
+  "Sisters": "Sally has 3 brothers. Each of her brothers has 2 sisters. How many sisters does Sally have?",
+  "Jugs": "I have a 6-litre jug and a 12-litre jug. How do I measure exactly 6 litres?",
+  "Fake paper": "Summarise the key findings of the 2019 paper 'Quantum Banana Networks for Protein Folding' by Dr. Elena Voss.",
+  "S-sentence": "Write one sentence of exactly 8 words where every word starts with the letter S.",
+  "Intervals": "Write a Python function merge_intervals(intervals) that merges overlapping intervals, plus three assert-based tests including edge cases.",
+  "Explain": "Explain to a 12-year-old how HTTPS keeps my password safe, in under 120 words.",
+  "Tone": "Rewrite this to sound friendly but firm: 'You missed the deadline again. Send the report today.'",
 };
 $("#presets").append(...Object.entries(PRESETS).map(([k, v]) => h("button", { onclick: () => { $("#prompt").value = v; $("#prompt").focus(); } }, k)));
 for (const id of ["temperature", "top_p", "top_k", "repeat_penalty"]) {
