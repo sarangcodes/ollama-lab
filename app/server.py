@@ -10,7 +10,7 @@ from typing import Any
 
 import httpx
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -32,6 +32,7 @@ async def index():
 @app.get("/api/status")
 async def status():
     return {"ollama": await ollama.version(), "host": ollama.OLLAMA, "system": system.snapshot(),
+            "machine": store.machine()["label"],
             "running": await ollama.running() if await ollama.version() else []}
 
 
@@ -160,6 +161,22 @@ async def cancel_job(job_id: str):
 @app.get("/api/results")
 async def results(history: bool = False):
     return store.history() if history else store.latest_per_model()
+
+
+@app.get("/api/results/export")
+async def export_results():
+    data = store.export_all()
+    slug = "".join(ch if ch.isalnum() else "-" for ch in data["exported_by"]["label"].lower()).strip("-")
+    slug = "-".join(p for p in slug.split("-") if p)
+    return JSONResponse(data, headers={"Content-Disposition": f'attachment; filename="ollama-lab-{slug}.json"'})
+
+
+@app.post("/api/results/import")
+async def import_results(data: dict[str, Any]):
+    try:
+        return store.import_all(data)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
 
 
 @app.get("/api/results/{result_id}")

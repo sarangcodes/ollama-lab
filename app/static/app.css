@@ -55,6 +55,10 @@ button, input, select, textarea { font: inherit; color: inherit; }
 button { background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; padding: 6px 12px; cursor: pointer; }
 button:hover { border-color: var(--muted); }
 button:disabled { opacity: .5; cursor: default; }
+a.button { display: inline-block; background: var(--surface-2); border: 1px solid var(--border); border-radius: 6px; padding: 6px 12px; color: var(--text); text-decoration: none; }
+a.button:hover { border-color: var(--muted); }
+.filter-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; margin-bottom: 8px; }
+.filter-row select { min-width: 220px; }
 button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
 button.link { background: none; border: 0; padding: 0; color: var(--accent); font-size: 12px; text-transform: none; }
 input:not([type=checkbox]):not([type=range]), select, textarea { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px 8px; }

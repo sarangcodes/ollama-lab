@@ -97,6 +97,8 @@
 
   <!-- Results -->
   <section id="tab-results" class="tab">
+    <div class="filter-row"><label class="row"><span>Mac</span><select id="r-mac"></select></label>
+      <span id="r-import-note" class="hint"></span></div>
     <div id="tiles" class="tiles"></div>
     <div class="charts">
       <figure class="panel chart">
@@ -112,7 +114,12 @@
     <div class="panel">
       <div class="table-head">
         <h2>All results</h2>
-        <label class="hint"><input type="checkbox" id="r-history"> show every run</label>
+        <div class="actions">
+          <label class="hint"><input type="checkbox" id="r-history"> show every run</label>
+          <a class="button" href="/api/results/export" download title="Save all results to a file you can send to someone">Export</a>
+          <button id="r-import" title="Add results exported from another Mac">Import</button>
+          <input type="file" id="r-import-file" accept=".json,application/json" hidden>
+        </div>
       </div>
       <div class="table-wrap"><table id="results-table"></table></div>
       <p class="hint">Click a row for per-question answers. Verdicts: Fast ≥ 25 tok/s · Usable ≥ 10 · Slow ≥ 4 ·
