@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ollama Lab</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">Ollama Lab</div>
+  <div id="status" class="status">Connecting…</div>
+</header>
+
+<nav class="tabs" role="tablist">
+  <button role="tab" data-tab="play" class="on">Playground</button>
+  <button role="tab" data-tab="bench">Benchmark</button>
+  <button role="tab" data-tab="results">Results</button>
+  <button role="tab" data-tab="models">Models</button>
+</nav>
+
+<main>
+  <!-- Playground -->
+  <section id="tab-play" class="tab on">
+    <div class="play">
+      <aside class="panel side">
+        <h3>Models <span class="hint">pick 2+ to compare</span></h3>
+        <div id="play-models" class="checklist"></div>
+        <h3>Settings</h3>
+        <label class="row"><span>Thinking</span><input type="checkbox" id="p-think"></label>
+        <label class="row"><span>Temperature <b id="v-temperature">0.7</b></span>
+          <input type="range" id="p-temperature" min="0" max="2" step="0.05" value="0.7"></label>
+        <label class="row"><span>Top P <b id="v-top_p">0.9</b></span>
+          <input type="range" id="p-top_p" min="0" max="1" step="0.05" value="0.9"></label>
+        <label class="row"><span>Top K <b id="v-top_k">40</b></span>
+          <input type="range" id="p-top_k" min="1" max="100" step="1" value="40"></label>
+        <label class="row"><span>Repeat penalty <b id="v-repeat_penalty">1.1</b></span>
+          <input type="range" id="p-repeat_penalty" min="0.8" max="1.5" step="0.05" value="1.1"></label>
+        <label class="row"><span>Context (tokens)</span>
+          <select id="p-num_ctx"><option>2048</option><option>4096</option><option selected>8192</option>
+            <option>16384</option><option>32768</option><option>65536</option></select></label>
+        <label class="row"><span>Max reply tokens</span><input type="number" id="p-num_predict" value="1024" min="16" max="32768"></label>
+        <label class="row"><span>Seed <span class="hint">blank = random</span></span><input type="number" id="p-seed" placeholder="random"></label>
+        <label class="col"><span>System prompt</span><textarea id="p-system" rows="3" placeholder="Optional"></textarea></label>
+        <label class="row"><span>Keep conversation</span><input type="checkbox" id="p-multi" checked></label>
+      </aside>
+      <div class="main-col">
+        <div class="panel">
+          <div class="presets" id="presets"></div>
+          <textarea id="prompt" rows="5" placeholder="Ask something… (⌘↵ to send)"></textarea>
+          <div class="actions">
+            <button id="send" class="primary">Send</button>
+            <button id="stop">Stop</button>
+            <button id="clear">New chat</button>
+            <span id="play-note" class="hint"></span>
+          </div>
+        </div>
+        <div id="outputs" class="outputs"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Benchmark -->
+  <section id="tab-bench" class="tab">
+    <div class="panel">
+      <h2>Run a benchmark</h2>
+      <p class="hint">Each model is loaded on its own (others are unloaded first), then measured: memory and GPU share,
+        cold load time, time to first token, reading speed on a ~4,000-token prompt (with a hidden fact to find),
+        writing speed, and accuracy on <span id="eval-count">26</span> auto-graded questions. Expect 1–3 minutes for
+        small models and 5–15 for big ones.</p>
+      <div class="bench-grid">
+        <div>
+          <h3>Models <button class="link" id="b-all">all</button> · <button class="link" id="b-none">none</button></h3>
+          <div id="bench-models" class="checklist"></div>
+        </div>
+        <div>
+          <h3>Settings</h3>
+          <label class="row"><span>Context (tokens)</span>
+            <select id="b-ctx"><option>4096</option><option selected>8192</option><option>16384</option><option>32768</option></select></label>
+          <label class="row"><span>Thinking during tests</span><input type="checkbox" id="b-think"></label>
+          <label class="row"><span>Speed runs</span><input type="number" id="b-runs" value="3" min="1" max="10"></label>
+          <label class="row"><span>Accuracy tests</span><input type="checkbox" id="b-evals" checked></label>
+          <p class="hint">Thinking makes reasoning models more accurate but several times slower.</p>
+          <div class="actions">
+            <button id="b-start" class="primary">Start</button>
+            <button id="b-cancel">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="panel" id="job-panel" hidden>
+      <div class="job-head"><b id="job-title"></b><span id="job-step" class="hint"></span></div>
+      <div class="bar"><div id="job-bar"></div></div>
+      <pre id="job-log" class="log"></pre>
+    </div>
+  </section>
+
+  <!-- Results -->
+  <section id="tab-results" class="tab">
+    <div id="tiles" class="tiles"></div>
+    <div class="charts">
+      <figure class="panel chart">
+        <figcaption><b>Writing speed</b> <span class="hint">tokens per second, smallest model first. Dashed line: 10 tok/s, about comfortable reading speed.</span></figcaption>
+        <div id="chart-speed"></div>
+      </figure>
+      <figure class="panel chart">
+        <figcaption><b>Accuracy vs memory</b> <span class="hint">score on the test set against memory used when loaded. Shaded: above the GPU memory cap.</span></figcaption>
+        <div id="chart-acc"></div>
+        <div id="legend-acc" class="legend"></div>
+      </figure>
+    </div>
+    <div class="panel">
+      <div class="table-head">
+        <h2>All results</h2>
+        <label class="hint"><input type="checkbox" id="r-history"> show every run</label>
+      </div>
+      <div class="table-wrap"><table id="results-table"></table></div>
+      <p class="hint">Click a row for per-question answers. Verdicts: Fast ≥ 25 tok/s · Usable ≥ 10 · Slow ≥ 4 ·
+        “Spills to CPU” when part of the model doesn't fit in GPU memory.</p>
+    </div>
+  </section>
+
+  <!-- Models -->
+  <section id="tab-models" class="tab">
+    <div class="panel">
+      <h2>Download a model</h2>
+      <p class="hint">Any tag from <a href="https://ollama.com/library" target="_blank" rel="noopener">ollama.com/library</a>, e.g. <code>qwen3.5:4b</code>, <code>gemma4:12b</code>.</p>
+      <div class="actions"><input id="pull-name" placeholder="model:tag"><button id="pull" class="primary">Download</button></div>
+      <div class="bar"><div id="pull-bar"></div></div>
+      <div id="pull-status" class="hint"></div>
+    </div>
+    <div class="panel">
+      <h2>Installed</h2>
+      <div class="table-wrap"><table id="models-table"></table></div>
+    </div>
+  </section>
+</main>
+
+<dialog id="detail"><div id="detail-body"></div><form method="dialog"><button>Close</button></form></dialog>
+<div id="tip" class="tip" hidden></div>
+<script src="/static/app.js"></script>
+</body>
+</html>
