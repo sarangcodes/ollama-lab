@@ -65,7 +65,7 @@ textarea { width: 100%; resize: vertical; }
 .row input[type=number], .row select { width: 110px; }
 .col { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; }
 
-.play { display: grid; grid-template-columns: 290px 1fr; gap: 16px; align-items: start; }
+.play { display: grid; grid-template-columns: 290px minmax(0, 1fr); gap: 16px; align-items: start; }
 .side { position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow: auto; }
 .checklist { display: flex; flex-direction: column; gap: 2px; max-height: 320px; overflow: auto; }
 .checklist label { display: flex; align-items: center; gap: 8px; padding: 4px 6px; border-radius: 6px; cursor: pointer; }
@@ -75,7 +75,7 @@ textarea { width: 100%; resize: vertical; }
 .presets { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
 .presets button { font-size: 12px; padding: 3px 10px; border-radius: 999px; }
 
-.outputs { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 16px; }
+.outputs { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: 16px; }
 .out { display: flex; flex-direction: column; min-height: 160px; }
 .out-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 8px; }
 .turn { margin: 0 0 12px; }
@@ -87,18 +87,18 @@ details.thinking div { white-space: pre-wrap; max-height: 240px; overflow: auto;
 .stats b { color: var(--text); font-variant-numeric: tabular-nums; }
 .err { color: var(--bad); }
 
-.bench-grid { display: grid; grid-template-columns: 1fr 320px; gap: 24px; }
+.bench-grid { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 24px; }
 .job-head { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
 .bar { height: 6px; background: var(--surface-2); border-radius: 3px; overflow: hidden; margin: 8px 0; }
 .bar div { height: 100%; width: 0; background: var(--accent); transition: width .3s; }
 .log { background: var(--bg); border-radius: 6px; padding: 10px; max-height: 360px; overflow: auto; font: 12px/1.5 ui-monospace, Menlo, monospace; margin: 0; white-space: pre-wrap; }
 
-.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 16px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: 16px; margin-bottom: 16px; }
 .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
 .tile .label { font-size: 12px; color: var(--text-2); }
 .tile .value { font-size: 22px; font-weight: 700; margin: 2px 0; word-break: break-word; }
 .tile .sub { font-size: 12px; color: var(--muted); }
-.charts { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.charts { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
 figure.chart { margin: 0 0 16px; }
 figcaption { margin-bottom: 8px; }
 .chart svg { width: 100%; height: auto; display: block; overflow: visible; }

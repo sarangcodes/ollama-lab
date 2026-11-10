@@ -25,6 +25,7 @@ function showTab(name) {
   $$(".tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === name));
   $$(".tab").forEach(t => t.classList.toggle("on", t.id === `tab-${name}`));
   try { localStorage.setItem("tab", name); } catch {}
+  history.replaceState(null, "", `#${name}`);
   if (name === "results") loadResults();
 }
 $$(".tabs button").forEach(b => b.addEventListener("click", () => showTab(b.dataset.tab)));
@@ -325,18 +326,23 @@ function hover(el, html) {
   el.addEventListener("mouseleave", () => (tip.hidden = true));
 }
 const esc = t => String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
-function niceMax(v) { const p = 10 ** Math.floor(Math.log10(v || 1)); return Math.ceil((v || 1) / p) * p; }
+// Round axis ticks: a step of 1, 2, 2.5 or 5 × 10^k, about four ticks to the top.
+function niceTicks(v) {
+  const raw = (v || 1) / 4, p = 10 ** Math.floor(Math.log10(raw));
+  const step = [1, 2, 2.5, 5, 10].map(m => m * p).find(st => st >= raw);
+  const top = Math.ceil((v || 1) / step) * step;
+  return { step, top, ticks: Array.from({ length: Math.round(top / step) + 1 }, (_, i) => +(i * step).toFixed(6)) };
+}
 
 function renderSpeed() {
   const rows = RESULTS.filter(r => r.gen_tok_s).sort((a, b) => (a.params_b || 0) - (b.params_b || 0));
   const el = $("#chart-speed");
   if (!rows.length) { el.replaceChildren(h("p", { class: "hint" }, "No data yet.")); return; }
   const W = 560, L = 150, R = 50, rowH = 26, T = 8, H = T + rows.length * rowH + 24;
-  const max = niceMax(Math.max(...rows.map(r => r.gen_tok_s), 12));
+  const { top: max, ticks } = niceTicks(Math.max(...rows.map(r => r.gen_tok_s), 12));
   const x = v => L + (v / max) * (W - L - R);
   const svg = s("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Writing speed by model" });
-  for (let i = 0; i <= 4; i++) {
-    const v = (max / 4) * i;
+  for (const v of ticks) {
     svg.append(s("line", { x1: x(v), x2: x(v), y1: T, y2: H - 20, class: "gridline" }), s("text", { x: x(v), y: H - 6, "text-anchor": "middle" }, Math.round(v)));
   }
   rows.forEach((r, i) => {
@@ -365,13 +371,13 @@ function renderAccuracy() {
   const colour = f => (fams.includes(f) ? `var(--s${fams.indexOf(f) + 1})` : "var(--other)");
   const W = 560, L = 40, R = 20, T = 12, B = 34, H = 300;
   const gpu = SYS?.gpu_limit_gb || 16;
-  const xmax = niceMax(Math.max(gpu * 1.15, ...rows.map(r => r.loaded_gb)) );
+  const { top: xmax, ticks: xticks } = niceTicks(Math.max(gpu * 1.15, ...rows.map(r => r.loaded_gb)));
   const x = v => L + (v / xmax) * (W - L - R), y = v => T + (1 - v / 100) * (H - T - B);
   const svg = s("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Accuracy against memory used" });
   svg.append(s("rect", { x: x(gpu), y: T, width: Math.max(0, x(xmax) - x(gpu)), height: H - T - B, fill: "var(--shade)" }),
     s("text", { x: x(gpu) + 4, y: T + 12 }, `GPU cap ${gpu} GB`));
   for (let v = 0; v <= 100; v += 25) svg.append(s("line", { x1: L, x2: W - R, y1: y(v), y2: y(v), class: "gridline" }), s("text", { x: L - 6, y: y(v) + 4, "text-anchor": "end" }, v));
-  for (let i = 0; i <= 4; i++) { const v = (xmax / 4) * i; svg.append(s("text", { x: x(v), y: H - B + 16, "text-anchor": "middle" }, `${Math.round(v)} GB`)); }
+  for (const v of xticks) svg.append(s("text", { x: x(v), y: H - B + 16, "text-anchor": "middle" }, `${v} GB`));
   svg.append(s("line", { x1: L, x2: W - R, y1: y(0), y2: y(0), class: "axis" }));
   const labelAll = rows.length <= 10;
   rows.forEach(r => {
@@ -425,7 +431,8 @@ async function showDetail(id) {
   api("/api/evals").then(e => ($("#eval-count").textContent = e.length)).catch(() => {});
   const running = (await api("/api/bench")).find(j => j.status === "running");
   if (running) watchJob(running.id);
-  let tab = "play"; try { tab = localStorage.getItem("tab") || "play"; } catch {}
+  let tab = location.hash.slice(1);
+  if (!$(`#tab-${tab}`)) { tab = "play"; try { tab = localStorage.getItem("tab") || "play"; } catch {} }
   showTab(tab);
   setInterval(refreshStatus, 4000);
 })();
