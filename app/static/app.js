@@ -18,7 +18,7 @@ const api = async (path, opts = {}) => {
   return r.json();
 };
 
-let MODELS = [], SYS = null;
+let MODELS = [], SYS = null, THIS_MAC = null;
 
 /* ---------- tabs ---------- */
 function showTab(name) {
@@ -35,6 +35,7 @@ async function refreshStatus() {
   try {
     const s = await api("/api/status");
     SYS = s.system;
+    THIS_MAC = s.machine;
     const el = $("#status");
     el.replaceChildren();
     if (!s.ollama) { el.append(h("span", { class: "pill bad" }, `Ollama not running at ${s.host}`)); return; }
@@ -256,6 +257,7 @@ function watchJob(id) {
 /* ---------- results ---------- */
 const COLS = [
   ["model", "Model", r => r.model],
+  ["mac", "Mac", r => r.mac || "–"],
   ["params_b", "Params (B)", r => fmt(r.params_b, 1), "num"],
   ["quant", "Quant", r => r.quant || "–"],
   ["disk_gb", "Disk GB", r => fmt(r.disk_gb), "num"],
@@ -278,16 +280,43 @@ const COLS = [
   ["think", "Thinking", r => r.think === null || r.think === undefined ? "n/a" : String(r.think)],
   ["created_at", "When", r => r.created_at?.replace("T", " ").slice(0, 16)],
 ];
+const ACC_COL = COLS.find(c => c[0] === "accuracy")[2];
 let RESULTS = [], sortKey = "params_b", sortDir = 1;
 const verdictClass = v => !v ? "" : /^(Fast|Usable)/.test(v) ? "v-good" : /^(Too slow|Failed)/.test(v) ? "v-bad" : "v-warn";
 const sortVal = (r, k) => k.startsWith("cat_") ? r.by_category?.[k.slice(4)] : r[k];
 
 async function loadResults() {
   const rows = await api("/api/results" + ($("#r-history").checked ? "?history=true" : ""));
-  RESULTS = rows.map(r => ({ id: r.id, created_at: r.created_at, ...r.metrics }));
+  ALL_RESULTS = rows.map(r => ({ id: r.id, created_at: r.created_at, mac: r.machine?.label, ...r.metrics }));
+  // Mac filter: defaults to this Mac; "All Macs" compares machines side by side.
+  const macs = [...new Set(ALL_RESULTS.map(r => r.mac).filter(Boolean))].sort();
+  const sel = $("#r-mac"), prev = sel.value;
+  sel.replaceChildren(h("option", { value: "" }, "All Macs"), ...macs.map(m => h("option", { value: m }, m + (m === THIS_MAC ? " (this Mac)" : ""))));
+  if (sel.dataset.touched) sel.value = macs.includes(prev) ? prev : "";
+  else sel.value = macs.includes(THIS_MAC) ? THIS_MAC : "";
+  applyMacFilter();
+}
+let ALL_RESULTS = [];
+const multiMac = () => new Set(RESULTS.map(r => r.mac)).size > 1;
+const label = r => multiMac() ? `${r.model} · ${r.mac}` : r.model;
+function applyMacFilter() {
+  const mac = $("#r-mac").value;
+  RESULTS = mac ? ALL_RESULTS.filter(r => r.mac === mac) : ALL_RESULTS;
   renderTable(); renderTiles(); renderSpeed(); renderAccuracy();
 }
 $("#r-history").addEventListener("change", loadResults);
+$("#r-mac").addEventListener("change", e => { e.target.dataset.touched = "1"; applyMacFilter(); });
+$("#r-import").addEventListener("click", () => $("#r-import-file").click());
+$("#r-import-file").addEventListener("change", async e => {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if (!file) return;
+  try {
+    const res = await api("/api/results/import", { method: "POST", body: await file.text() });
+    $("#r-import-note").textContent = `Imported ${res.added} result(s)` + (res.skipped ? `, ${res.skipped} already here` : "") + ". Pick “All Macs” to compare.";
+    loadResults();
+  } catch (err) { $("#r-import-note").textContent = `Import failed: ${err.message}`; }
+});
 
 function renderTable() {
   const rows = [...RESULTS].sort((a, b) => {
@@ -299,7 +328,7 @@ function renderTable() {
     h("thead", {}, h("tr", {}, ...COLS.map(([k, label, , cls]) => h("th", { class: cls, onclick: () => { sortDir = sortKey === k ? -sortDir : 1; sortKey = k; renderTable(); } },
       label + (sortKey === k ? (sortDir > 0 ? " ↑" : " ↓") : ""))))),
     h("tbody", {}, ...(rows.length ? rows.map(r => h("tr", { onclick: () => showDetail(r.id) },
-      ...COLS.map(([, , f, cls]) => h("td", { class: cls }, r.error && f === COLS[10][2] ? "error" : f(r)))))
+      ...COLS.map(([, , f, cls]) => h("td", { class: cls }, r.error && f === ACC_COL ? "error" : f(r)))))
       : [h("tr", {}, h("td", { colspan: COLS.length, class: "hint" }, "No results yet. Run a benchmark first."))])));
 }
 
@@ -312,7 +341,7 @@ function renderTiles() {
   const accurate = best(ok.filter(r => r.accuracy !== null && r.accuracy !== undefined), r => r.accuracy * 1000 + r.gen_tok_s / 1000);
   const sweet = best(onGpu.filter(r => r.gen_tok_s >= 10 && r.accuracy !== null && r.accuracy !== undefined), r => r.accuracy * 1000 + r.gen_tok_s / 1000);
   const tile = (label, r, sub) => h("div", { class: "tile" }, h("div", { class: "label" }, label),
-    h("div", { class: "value" }, r ? r.model : "–"), h("div", { class: "sub" }, r ? sub(r) : "run a benchmark"));
+    h("div", { class: "value" }, r ? r.model : "–"), r && multiMac() ? h("div", { class: "sub" }, r.mac) : null, h("div", { class: "sub" }, r ? sub(r) : "run a benchmark"));
   $("#tiles").replaceChildren(
     tile("Biggest model that fits on the GPU", biggest, r => `${fmt(r.params_b)}B params · ${fmt(r.loaded_gb)} GB · ${fmt(r.gen_tok_s)} tok/s`),
     tile("Sweet spot (best accuracy at ≥ 10 tok/s)", sweet, r => `${fmt(r.accuracy, 0)}% accurate · ${fmt(r.gen_tok_s)} tok/s`),
@@ -341,7 +370,7 @@ function renderSpeed() {
   const rows = RESULTS.filter(r => r.gen_tok_s).sort((a, b) => (a.params_b || 0) - (b.params_b || 0));
   const el = $("#chart-speed");
   if (!rows.length) { el.replaceChildren(h("p", { class: "hint" }, "No data yet.")); return; }
-  const W = 560, L = 150, R = 50, rowH = 26, T = 8, H = T + rows.length * rowH + 24;
+  const W = multiMac() ? 680 : 560, L = multiMac() ? 270 : 150, R = 50, rowH = 26, T = 8, H = T + rows.length * rowH + 24;
   const { top: max, ticks } = niceTicks(Math.max(...rows.map(r => r.gen_tok_s), 12));
   const x = v => L + (v / max) * (W - L - R);
   const svg = s("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": "Writing speed by model" });
@@ -350,12 +379,12 @@ function renderSpeed() {
   }
   rows.forEach((r, i) => {
     const y = T + i * rowH, w = Math.max(2, x(r.gen_tok_s) - L);
-    svg.append(s("text", { x: L - 8, y: y + rowH / 2 + 4, "text-anchor": "end" }, r.model));
+    svg.append(s("text", { x: L - 8, y: y + rowH / 2 + 4, "text-anchor": "end" }, label(r)));
     // bar with the 4px rounded end away from the baseline
     svg.append(s("path", { d: `M${L},${y + 5}h${w - 4}a4,4 0 0 1 4,4v${rowH - 18}a4,4 0 0 1 -4,4h${-(w - 4)}z`, fill: "var(--s1)", opacity: (r.gpu_pct ?? 100) < 99.5 ? 0.45 : 1 }));
     svg.append(s("text", { x: L + w + 6, y: y + rowH / 2 + 4 }, fmt(r.gen_tok_s)));
     const hit = s("rect", { x: 0, y, width: W, height: rowH, class: "hit" });
-    hover(hit, `<b>${esc(r.model)}</b><br>${fmt(r.gen_tok_s)} tok/s writing · ${fmt(r.prompt_tok_s, 0)} tok/s reading<br>first token ${fmt(r.ttft_s, 2)} s · ${fmt(r.gpu_pct, 0)}% on GPU`);
+    hover(hit, `<b>${esc(label(r))}</b><br>${fmt(r.gen_tok_s)} tok/s writing · ${fmt(r.prompt_tok_s, 0)} tok/s reading<br>first token ${fmt(r.ttft_s, 2)} s · ${fmt(r.gpu_pct, 0)}% on GPU`);
     hit.addEventListener("click", () => showDetail(r.id));
     svg.append(hit);
   });
@@ -386,9 +415,9 @@ function renderAccuracy() {
   rows.forEach(r => {
     const cx = x(r.loaded_gb), cy = y(r.accuracy);
     svg.append(s("circle", { cx, cy, r: 6, fill: colour(r.family || "other"), stroke: "var(--surface)", "stroke-width": 2 }));
-    if (labelAll) svg.append(s("text", { x: cx + 9, y: cy - 8 }, r.model));
+    if (labelAll) svg.append(s("text", { x: cx + 9, y: cy - 8 }, label(r)));
     const hit = s("circle", { cx, cy, r: 14, class: "hit" });
-    hover(hit, `<b>${esc(r.model)}</b><br>${fmt(r.accuracy, 0)}% accurate · ${fmt(r.loaded_gb)} GB loaded<br>${fmt(r.gen_tok_s)} tok/s · ${esc(r.verdict || "")}`);
+    hover(hit, `<b>${esc(label(r))}</b><br>${fmt(r.accuracy, 0)}% accurate · ${fmt(r.loaded_gb)} GB loaded<br>${fmt(r.gen_tok_s)} tok/s · ${esc(r.verdict || "")}`);
     hit.addEventListener("click", () => showDetail(r.id));
     svg.append(hit);
   });
@@ -403,7 +432,7 @@ async function showDetail(id) {
   const body = $("#detail-body");
   body.replaceChildren(
     h("h2", {}, `${m.model} · ${m.verdict || ""}`),
-    h("p", { class: "hint" }, `${r.created_at} · context ${r.settings.num_ctx} · thinking ${m.think ?? "n/a"}`),
+    h("p", { class: "hint" }, `${r.machine?.label || "unknown Mac"} · GPU cap ${r.machine?.gpu_limit_gb ?? "?"} GB · ${r.created_at} · context ${r.settings.num_ctx} · thinking ${m.think ?? "n/a"}`),
     m.error ? h("pre", { class: "err" }, m.error) : null,
     h("div", { class: "table-wrap" }, h("table", {}, h("tbody", {}, ...[
       ["Memory loaded", `${fmt(m.loaded_gb)} GB (${fmt(m.gpu_pct, 0)}% on GPU)`],

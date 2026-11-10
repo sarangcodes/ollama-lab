@@ -60,8 +60,9 @@ Then open **Results**. For fair numbers:
 - Don't chat in the Playground while a benchmark runs: it competes for the same chip and the benchmark unloads
   other models.
 
-**6. Share your results.** Stop the app (Ctrl+C) and send the file `data/results.db`. It holds only benchmark numbers
-and the models' answers to the test questions.
+**6. Share your results.** In **Results**, click **Export** and send the downloaded `.json` file. It holds only the
+benchmark numbers, the models' answers to the test questions, and the Mac's chip, memory and macOS version. The other
+person clicks **Import**, then picks **All Macs** to compare both machines side by side.
 
 **Update later:** `git pull` in the `ollama-lab` folder, then start the app again.
 
