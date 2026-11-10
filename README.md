@@ -13,13 +13,62 @@ It answers one question: **how big a model can this Mac run, and how good and fa
 
 Everything is read live from the Ollama API; nothing to configure.
 
-## Run it
+## Set it up on your Mac
+
+Needs an Apple Silicon Mac (M1 or later) and [Homebrew](https://brew.sh). About 15 minutes plus model downloads.
+
+**1. Install Ollama and uv** (uv runs the Python app and installs its packages for you):
 
 ```bash
-brew install ollama && brew services start ollama   # once
-ollama pull qwen3.5:4b                              # or use the Models tab
+brew install ollama uv git
+brew services start ollama        # runs Ollama in the background, also after a restart
+```
+
+**2. Get the code and start the app:**
+
+```bash
+git clone https://github.com/sarangcodes/ollama-lab.git
+cd ollama-lab
 uv run uvicorn app.server:app --port 8777
-open http://127.0.0.1:8777
+```
+
+Leave that Terminal window open, then go to **http://127.0.0.1:8777**. The bar at the top should show your chip, RAM
+and "GPU cap". If it says Ollama isn't running, run `brew services restart ollama`.
+
+**3. Download models** in the **Models** tab (or `ollama pull <name>` in another Terminal window).
+Pick by how much memory your Mac has:
+
+| Mac memory | Start with | Largest worth trying | Total download |
+|---|---|---|---|
+| 8 GB | `qwen3.5:0.8b`, `qwen3.5:2b` | `qwen3.5:4b` | ~8 GB |
+| **16 GB** | `qwen3.5:0.8b`, `qwen3.5:2b`, `qwen3.5:4b`, `gemma4:e2b` | `qwen3.5:9b`, `deepseek-r1:8b` | ~30 GB |
+| 24 GB | the 16 GB list + `gemma4:e4b`, `gemma4:12b` | `deepseek-r1:14b`, `gpt-oss:20b` | ~75 GB |
+| 32 GB+ | the 24 GB list | `qwen3.5:27b`, `gemma4:26b` | ~110 GB |
+
+On 16 GB, `gemma4:12b` is a good way to see what happens when a model is too big: it partly spills onto the CPU and
+slows down a lot. Remove a model with `ollama rm <name>`.
+
+**4. Try it.** In **Playground**, tick one or more models, click a preset question (Sisters, Jugs, Fake paper…) and
+Send. Tick several sizes to compare them side by side. Speed and memory stats appear under each reply.
+
+**5. Benchmark.** In **Benchmark**, tick the models and press Start. Each model takes 1–15 minutes depending on size.
+Then open **Results**. For fair numbers:
+
+- Close the browser tabs, IDEs and other apps you don't need (they share the same memory).
+- Plug in the charger. A MacBook Air has no fan and slows down during long runs, so expect the last models to be a
+  little slower than if run alone.
+- Don't chat in the Playground while a benchmark runs: it competes for the same chip and the benchmark unloads
+  other models.
+
+**6. Share your results.** Stop the app (Ctrl+C) and send the file `data/results.db`. It holds only benchmark numbers
+and the models' answers to the test questions.
+
+**Update later:** `git pull` in the `ollama-lab` folder, then start the app again.
+
+### Running it day to day
+
+```bash
+cd ollama-lab && uv run uvicorn app.server:app --port 8777
 ```
 
 Headless benchmark (same code, results go to the same database):
@@ -51,9 +100,11 @@ Add items there; each has a checker function, so no grading by hand.
 
 ## Notes for Apple Silicon
 
-- macOS lets the GPU use about two thirds of unified memory by default (≈16 GB on a 24 GB Mac). Models bigger than
-  that spill onto the CPU. You can raise the cap until the next reboot with
-  `sudo sysctl iogpu.wired_limit_mb=19456` (leave a few GB for macOS).
+- macOS lets the GPU use about two thirds of unified memory by default (≈10.7 GB on a 16 GB Mac, ≈16 GB on 24 GB). Models bigger than
+  that spill onto the CPU. You can raise the cap until the next reboot, leaving a few GB for macOS, e.g.
+  `sudo sysctl iogpu.wired_limit_mb=12288` on 16 GB or `=19456` on 24 GB.
+- Writing speed is limited by memory speed: about 100 GB/s on base M1–M3 chips, so a 4 GB model writes at most
+  ~25 tokens/s. Pro and Max chips are 2–5× faster with the same model.
 - Other apps count: close browsers and IDEs before benchmarking large models. The status bar shows RAM and swap.
 - Context size costs memory too: the same model uses more at 32k context than at 8k.
 - Thinking models (qwen3.5, gemma4, gpt-oss) get more accurate with thinking on, but write many more tokens per
